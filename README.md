@@ -1,2 +1,2 @@
-# local_learning_wsi
-Repository for "Gigapixel Whole-Slide Images Classification using Locally Supervised Learning"
+# Gigapixel Whole-Slide Images Classification using Locally Supervised Learning
+Code will be released soon.
