@@ -1,2 +1,5 @@
 # Gigapixel Whole-Slide Images Classification using Locally Supervised Learning
-Code will be released soon.
+===========
+
+## TODOs
+- [ ] Refine code and provide more explainations.
