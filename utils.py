@@ -36,64 +36,6 @@ def save_model_structure(args, model):
     except:
         print("ERROR! Could not copy source file.")
 
-import time
-def sleep_check(gpu_id, seconds):
-    import nvidia_smi
-    if isinstance(gpu_id,(list, tuple)):
-        assert len(gpu_id) == 1
-        gpu_id = gpu_id[0]
-    while True:
-        nvidia_smi.nvmlInit()
-        handle = nvidia_smi.nvmlDeviceGetHandleByIndex(int(gpu_id))
-
-        info = nvidia_smi.nvmlDeviceGetMemoryInfo(handle)
-        print("Used memory:", info.used)
-        if info.used < 1e9:
-            break
-        nvidia_smi.nvmlShutdown()
-        time.sleep(seconds)
-
-
-
-from datetime import timedelta
-from pathlib import Path
-from pytorch_lightning.callbacks import ModelCheckpoint
-from typing import Optional, Union
-
-class ModelCheckpointNoTrain(ModelCheckpoint):
-    def __init__(
-            self,
-            dirpath: Optional[Union[str, Path]] = None,
-            filename: Optional[str] = None,
-            monitor: Optional[str] = None,
-            verbose: bool = False,
-            save_last: Optional[bool] = None,
-            save_top_k: int = 1,
-            save_weights_only: bool = False,
-            mode: str = "min",
-            auto_insert_metric_name: bool = True,
-            every_n_train_steps: Optional[int] = None,
-            train_time_interval: Optional[timedelta] = None,
-            every_n_epochs: Optional[int] = None,
-            save_on_train_epoch_end: Optional[bool] = None,
-            period: Optional[int] = None,
-            every_n_val_epochs: Optional[int] = None,
-    ):
-        super().__init__(dirpath, filename,
-            monitor,
-            verbose,
-            save_last,
-            save_top_k,
-            save_weights_only,
-            mode,
-            auto_insert_metric_name,
-            every_n_train_steps,
-            train_time_interval,
-            every_n_epochs,
-            save_on_train_epoch_end,
-            period,
-            every_n_val_epochs)
-
 
 class _BaseRandomCrop(DualTransform):
     # Base class for RandomSizedCrop and RandomResizedCrop
@@ -201,7 +143,6 @@ class RandomCrop(_BaseRandomCrop):
         return "scale", "ratio", "interpolation"
 
 
-
 class RandomCropEdge(_BaseRandomCrop):
     """Torchvision's variant of crop a random part of the input and rescale it to some size.
 
@@ -242,6 +183,7 @@ class RandomCropEdge(_BaseRandomCrop):
 
         hw = [0, 0]
         for i in range(2):
+            #####: Major modification here
             scale = self.scale if img.shape[i] >= self.small_length else self.scale_for_small
             hw[i] = random.uniform(*scale) * img.shape[i]
             hw[i] = int(round(hw[i]))

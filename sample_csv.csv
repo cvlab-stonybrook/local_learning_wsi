@@ -1,0 +1,7 @@
+slide_id,label,type
+TCGA-69-8453-01Z-00-DX1.jpg,0,test
+TCGA-66-2766-01Z-00-DX1.jpg,1,test
+TCGA-64-1681-01Z-00-DX1.jpg,0,train
+TCGA-77-8130-01Z-00-DX1.jpg,1,train
+TCGA-69-7764-01Z-00-DX1.jpg,0,valid
+TCGA-O2-A52N-01Z-00-DX1.jpg,1,valid

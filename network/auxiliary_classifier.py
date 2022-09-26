@@ -3,7 +3,6 @@ from torch import nn
 import torch.nn.functional as F
 
 from .base_classifier import BaseClassifier
-from .losses import SupConLoss
 
 from timm.loss import LabelSmoothingCrossEntropy
 
@@ -22,10 +21,10 @@ class AuxClassifier(BaseClassifier):
         self.loss_mode = loss_mode
         self.feature_dim = feature_dim
 
-        if loss_mode == 'contrast':
-            self.criterion = SupConLoss()
-            self.fc_out_channels = feature_dim
-        elif loss_mode == 'cross_entropy':
+        # if loss_mode == 'contrast':
+        #     self.criterion = SupConLoss()
+        #     self.fc_out_channels = feature_dim
+        if loss_mode == 'cross_entropy':
             self.criterion = nn.CrossEntropyLoss(weight=loss_weight)
             self.fc_out_channels = class_num
         elif loss_mode == 'label_smooth_cross_entropy':
@@ -170,15 +169,13 @@ class AuxClassifier(BaseClassifier):
                 )
 
     def forward(self, features, x=None, label=None):
-
         features = self.head(features)
-
-        if self.loss_mode == 'contrast':
-            assert features.size(1) == self.feature_dim
-            features = F.normalize(features, dim=1)
-            features = features.unsqueeze(1)
-            loss = self.criterion(features, label, temperature=0.07)
-        elif self.loss_mode == 'cross_entropy' or self.loss_mode == 'label_smooth_cross_entropy':
+        # if self.loss_mode == 'contrast':
+        #     assert features.size(1) == self.feature_dim
+        #     features = F.normalize(features, dim=1)
+        #     features = features.unsqueeze(1)
+        #     loss = self.criterion(features, label, temperature=0.07)
+        if self.loss_mode == 'cross_entropy' or self.loss_mode == 'label_smooth_cross_entropy':
             loss = self.criterion(features, label)
         elif self.loss_mode is None:
             loss = features

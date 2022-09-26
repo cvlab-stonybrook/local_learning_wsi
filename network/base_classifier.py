@@ -1,6 +1,5 @@
 from typing import Optional, Iterable
 
-import numpy
 import torch
 from torch import nn
 

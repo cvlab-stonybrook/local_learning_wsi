@@ -8,36 +8,40 @@ from torch import nn
 from torchmetrics import MetricCollection, Accuracy, AUROC
 from pytorch_lightning.callbacks import ModelCheckpoint, LearningRateMonitor
 
+import albumentations as A
+from albumentations.pytorch import ToTensorV2
+
 from network.auxiliary_classifier import AuxClassifier
 from network.base_classifier import ClassifierLossModuleList
-from network.infopro_decoder import RandomInfoProDecoder, InfoProDecoder
-from network.pooling import AttentionPooling, GatedAttentionPooling
-from network.resnet import Resnet34Local, Resnet34LocalBatchNorm, Resnet34LocalBatchNormStride2
+from network.infopro_decoder import RandomInfoProDecoder
+from network.pooling import GatedAttentionPooling
+from network.resnet import Resnet34LocalBatchNorm
 from options import get_arguments
 from csv_dataset import CsvDataModule
-from pl_module.improved_trainer import ImprovedLocalModule
-from utils import save_parameters, RandomCrop, RandomCropEdge
+from trainer import LocalModule
+from utils import save_parameters, RandomCropEdge
 
 
 def get_A_transforms():
-    import albumentations as A
-    from albumentations.pytorch import ToTensorV2
+    # we normlize wsis according to the mean and std of each dataset, filtering backgrounds.
+    # The fallback values here are the mean and std of the entire TCGA dataset.
     mean = args.data_mean if args.data_mean else [0.7223, 0.5304, 0.6579]
     std = args.data_std if args.data_std else [0.2057, 0.2471, 0.2010]
-    transform_train = A.Compose([
+    transform_train_fn = A.Compose([
+        # For smaller WSI, we set a conservative scale, otherwise, it may result in too small images
         RandomCropEdge(scale=(0.5, 1.0), scale_for_small=(0.9, 1.0), small_length=3000, p=0.6),
         A.Flip(p=0.75),
         A.RandomRotate90(),
         A.ColorJitter(0.1, 0.1, 0.1, 0.1),
-        # A.Affine(scale=(0.5, 1.0), translate_percent=(-0.15, 0.15), rotate=(-45, 45), shear=(-45, 45), p=0.5),
-
         A.Normalize(mean=mean, std=std),
         ToTensorV2(),
     ])
-    transform_test = A.Compose([
+    transform_test_fn = A.Compose([
         A.Normalize(mean=mean, std=std),
         ToTensorV2(),
     ])
+    transform_train = lambda x: transform_train_fn(image=x)["image"]
+    transform_test = lambda x: transform_test_fn(image=x)["image"]
     return transform_train, transform_test
 
 
@@ -65,8 +69,10 @@ def get_metric(num_classes):
 
 def get_loss_cfg_8():
     clsloss_cfg_8 = {
-        1: {"in_plane": 64, "mid_plane": 64, "out_plane": 64, "patch_sz": 128, "n_patch": 10, "upscale": 1,
-            "kernel_size": 9, "stride": 9, "padding": 0},
+        1: {"in_plane": 64, "mid_plane": 64, "out_plane": 64,  # feature dims
+            "patch_sz": 128, "n_patch": 10, "upscale": 1,  # sampling parameters
+            "kernel_size": 9, "stride": 9, "padding": 0},  # parameters in the additional cnn layer
+        # 2:{...} and 3:{...} are the same as 1:{...}
         4: {"in_plane": 64, "mid_plane": 128, "out_plane": 128, "patch_sz": 64, "n_patch": 10, "upscale": 2,
             "kernel_size": 9, "stride": 9, "padding": 0},
         5: {"in_plane": 128, "mid_plane": 128, "out_plane": 128, "patch_sz": 64, "n_patch": 10, "upscale": 1,
@@ -80,6 +86,7 @@ def get_loss_cfg_8():
     clsloss_cfg_8[3] = clsloss_cfg_8[1]
     return clsloss_cfg_8
 
+
 def get_loss_cfg_4():
     clsloss_cfg_4 = {
         1: {"in_plane": 64, "mid_plane": 64, "out_plane": 64, "patch_sz": 128, "n_patch": 10, "upscale": 1,
@@ -91,6 +98,7 @@ def get_loss_cfg_4():
     }
 
     return clsloss_cfg_4
+
 
 def get_loss_networks(K, class_num, weight=None):
     if K == 8:
@@ -105,7 +113,7 @@ def get_loss_networks(K, class_num, weight=None):
         weight = torch.tensor(weight)
 
     loss_net = []
-    for i in range(1, K):
+    for i in range(1, K):  # the 0-th place is kept empty
         cfg = clsloss_cfg[i]
         loss_net.append(
             ClassifierLossModuleList(modules=[
@@ -118,7 +126,7 @@ def get_loss_networks(K, class_num, weight=None):
                               kernel_size=cfg["kernel_size"], stride=cfg["stride"], padding=cfg["padding"],
                               loss_weight=weight),
                 ],
-                alphas=[args.alpha,
+                alphas=[args.alpha,  ### Hyperparameter alpha
                         1.],
             )
         )
@@ -136,10 +144,8 @@ def get_loss_networks(K, class_num, weight=None):
     return loss_net
 
 
-
 def main(args):
-    data_module = CsvDataModule(args.dataset_root, args.dataset_csv, args.batch_size, contain_test=True,
-                                val_fold_id=args.val_fold, data_ext=args.dataext, cus_transforms=get_A_transforms(),
+    data_module = CsvDataModule(args.dataset_root, args.dataset_csv, args.batch_size, cus_transforms=get_A_transforms(),
                                 num_workers=args.num_workers)
     num_classes = args.num_classes
 
@@ -150,18 +156,17 @@ def main(args):
     loss_weight = args.loss_weight
     loss_networks = get_loss_networks(args.K, num_classes, weight=loss_weight)
 
-    trainer_model = ImprovedLocalModule(backbone_model, loss_networks, get_metric(num_classes), None, args, num_classes,
-                                        valid_as_train=True)
+    trainer_model = LocalModule(backbone_model, loss_networks, get_metric(num_classes), args, num_classes,
+                                valid_as_train=True)
 
-    logger = WandbLogger(project=args.run_name, name=args.tag, log_model=True)
+    logger = WandbLogger(project=args.project_name, name=args.run_name, log_model=True)
 
     trainer = pl.Trainer(default_root_dir=os.path.join(args.output_dir, args.run_name), gpus=args.gpu_id,
                          max_epochs=args.epochs, log_every_n_steps=50, num_sanity_val_steps=0,
                          precision=args.precision,
-                         # accelerator='ddp',
                          logger=logger,
                          callbacks=lr_monitor,
-                         progress_bar_refresh_rate=None if args.debug else 0)
+                         progress_bar_refresh_rate=None if args.progressive else 0)
 
     trainer.fit(trainer_model, data_module)
 
@@ -169,5 +174,5 @@ def main(args):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     args = get_arguments(parser)
-    save_parameters(args)
+    # save_parameters(args)
     main(args)

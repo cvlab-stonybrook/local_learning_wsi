@@ -6,30 +6,27 @@ import pandas as pd
 import torch
 from torch.utils.data import Dataset, DataLoader
 from torchvision import transforms
-from PIL import Image
 import pytorch_lightning as pl
-# import jpeg4py as jpeg
 
 
+# from PIL import Image
 def read_rgb_img(img_path):
     # return Image.open(img_path).convert('RGB')
     return cv2.cvtColor(cv2.imread(img_path), cv2.COLOR_BGR2RGB)
 
-
+# import jpeg4py as jpeg
 # def read_rgb_jpg(img_path):
 #     return jpeg.JPEG(img_path).decode()
 
 
 class CsvDataset(Dataset):
 
-    def __init__(self, dataset_path, dataset_csv, data_type, transforms=transforms.ToTensor(), **kwargs):
+    def __init__(self, dataset_path, dataset_csv, data_type, transforms=transforms.ToTensor()):
         self.root_path = dataset_path
         self.dataset_csv_path = dataset_csv
-        if data_type not in ['train', 'validation', 'test']:
-            raise Exception("Not supported dataset type. It should be train, validation or test")
+        if data_type not in ['train', 'valid', 'test']:
+            raise Exception("Not supported dataset type. It should be train, valid or test")
         self.data_type = data_type
-        if data_type == 'test':
-            self.val_fold_id = -1
 
         # read csv and store label
         self.label_df = self.read_dataset_csv()
@@ -52,8 +49,7 @@ class CsvDataset(Dataset):
         img = read_rgb_img(full_path)
 
         if self.transforms is not None:
-            img = self.transforms(image=img)
-            img = img["image"]
+            img = self.transforms(img)
             if isinstance(img, np.ndarray):
                 img = transforms.ToTensor()(img)
 
@@ -61,12 +57,12 @@ class CsvDataset(Dataset):
 
     def read_dataset_csv(self):
         df = pd.read_csv(self.dataset_csv_path, header=0)
-        if self.data_type == 'validation':
-            df = df[int(df['type']) == 1]
+        if self.data_type == 'valid':
+            df = df[df['type'] == 'valid']
         elif self.data_type == 'test':
-            df = df[int(df['type']) == 2]
+            df = df[df['type'] == 'test']
         else:
-            df = df[int(df['type']) == 0]
+            df = df[df['type'] == 'train']
         return df
 
     def get_weights_of_class(self):
@@ -84,7 +80,6 @@ class CsvDataModule(pl.LightningDataModule):
         self.dataset_path = dataset_path
         self.dataset_csv = dataset_csv
 
-        # self.cus_transforms = cus_transforms
         if cus_transforms is None:
             self.transforms_train, self.transforms_eval = None, None
         elif isinstance(cus_transforms, (list, tuple)):
@@ -102,18 +97,12 @@ class CsvDataModule(pl.LightningDataModule):
 
     def setup(self, stage=None):
         if self.dataset_train is None:
-            self.dataset_train = CsvDataset(self.dataset_path, self.dataset_csv, "train", val_fold_id=self.val_fold_id,
-                                            data_ext=self.data_ext, transforms=self.transforms_train,
-                                            classes_names=[self.CLASSES, self.CLASS_NAMES])
-
-            self.dataset_val = CsvDataset(self.dataset_path, self.dataset_csv, "train",
-                                          val_fold_id=self.val_fold_id,
-                                          data_ext=self.data_ext, transforms=self.transforms_eval,
-                                          classes_names=[self.CLASSES, self.CLASS_NAMES])
-            self.dataset_test = CsvDataset(self.dataset_path, self.dataset_csv, "train",
-                                           val_fold_id=self.val_fold_id,
-                                           data_ext=self.data_ext, transforms=self.transforms_eval,
-                                           classes_names=[self.CLASSES, self.CLASS_NAMES])
+            self.dataset_train = CsvDataset(self.dataset_path, self.dataset_csv, "train",
+                                            transforms=self.transforms_train)
+            self.dataset_val = CsvDataset(self.dataset_path, self.dataset_csv, "valid",
+                                          transforms=self.transforms_eval)
+            self.dataset_test = CsvDataset(self.dataset_path, self.dataset_csv, "test",
+                                           transforms=self.transforms_eval)
 
     def train_dataloader(self):
         return DataLoader(self.dataset_train, batch_size=self.batch_size, shuffle=True, num_workers=self.num_workers,
@@ -127,7 +116,7 @@ class CsvDataModule(pl.LightningDataModule):
         return (DataLoader(self.dataset_val, batch_size=self.batch_size, shuffle=False, num_workers=self.num_workers,
                               drop_last=False, pin_memory=False, persistent_workers=True),
                 DataLoader(self.dataset_test, batch_size=self.batch_size, shuffle=False, num_workers=self.num_workers,
-                           drop_last=False, pin_memory=False, persistent_workers=True), )
+                           drop_last=False, pin_memory=False, persistent_workers=True))
 
     def test_dataloader(self):
         return DataLoader(self.dataset_test, batch_size=self.batch_size, shuffle=False, num_workers=self.num_workers,
