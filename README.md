@@ -18,7 +18,7 @@ You can also use docker or singularity. We provide the [Dockerfile](Dockerfile) 
 If you do not want to use wandb, you can comment the logger in [main.py](main.py) (line 162 and 167).
 
 ## Data organization
-Our dataset is organized as csv indicated datasets. All the images should be stored in a single directory and the path of this directory (```dataset_root```) should be passed to ```main.py```. The labels and train/validation/test seperation should be listed in a csv file. This csv file should contain 3 columns: ```slide_id```, ```label``` and ```type```. ```slide_id``` is the filename of input image, including file extension. ```label``` is the integer label of a input WSI. The values in the ```type``` column should be "train", "valid" or "test". A [sample csv file](sample_csv.csv ) is provided. 
+Our dataset is organized as csv indicated datasets. All the images should be stored in a single directory and the path of this directory (```dataset_root```) should be passed to ```main.py```. The labels and train/validation/test separation should be listed in a csv file. This csv file should contain 3 columns: ```slide_id```, ```label``` and ```type```. ```slide_id``` is the filename of input image, including file extension. ```label``` is the integer label of a input WSI. The values in the ```type``` column should be "train", "valid" or "test". A [sample csv file](sample_csv.csv ) is provided. 
 
 ## Training
 We used ```train.py``` to conduct our training pipeline. 
@@ -48,7 +48,7 @@ Useful arguments:
 [--alpha]              # Hyperparameter alpha
 [--decay-multi-epochs] # Epochs to decay lr (e.g. "10,20" means the lr will decay at epch 10 and 20 by a factor of 0.1)
 ```
-Note that ```--batch-size``` should always be 1 as the input images usually have different sizes. We accumulate gradient of several batchs by setting ```--accumulate-grad-batches```, it is equivalent to a larger batch size.
+Note that ```--batch-size``` should always be 1 as the input images usually have different sizes. We accumulate gradient of several batches by setting ```--accumulate-grad-batches```, it is equivalent to a larger batch size.
 
 The entire training can be done by, for example:
 
@@ -66,7 +66,7 @@ If you have any questions or concerns, feel free to report issues or directly co
 
 ## Acknowledgments
 Part of our code was borrowed from [InfoPro-Pytorch](https://github.com/blackfeather-wang/InfoPro-Pytorch). Thanks for their outstanding paper.
-Our framework used [Pytorch Lightning](https://github.com/Lightning-AI/lightning). Thanks for this simple and efficient framework which faciliated our developments.
+Our framework used [Pytorch Lightning](https://github.com/Lightning-AI/lightning). Thanks for this simple and efficient framework which facilitates our developments.
 
 ## Citation
 If you use the code or results in your research, please use the following BibTeX entry.  
